@@ -10,6 +10,7 @@
 #include <array>
 #include <stdexcept>
 #include <utility>
+#include <iterator>
 
 using namespace std;
 
@@ -44,7 +45,11 @@ public:
     SimpleVector() noexcept = default;
 
     // Конструктор создаёт массив из size элементов, инициализированных значением по умолчанию
-    explicit SimpleVector(size_t size) : storage_(size), size_(size), capacity_(size) {}
+    explicit SimpleVector(size_t size) : storage_(size), size_(size), capacity_(size) {
+        fill(storage_.Get(), storage_.Get() + size, Type{});
+        // в теле конструктора необходима инициализация?  Ведь при storage_(size) вызавается конструктор умного указателя
+        // в котором уже выполняется инициализация значениями по умолчанию
+    }
 
     // Конструктор создаёт массив из size элементов, инициализированных значением value
     SimpleVector(size_t size, const Type& value) : storage_(size), size_(size), capacity_(size) {
@@ -82,10 +87,16 @@ public:
 
     // Оператор присваевания на основе copy and swap
     SimpleVector& operator=(const SimpleVector& rhs) {
-        if (this != &rhs) { // случай с самоприсваиванием.
-            SimpleVector temp(rhs); //копия 
-            this->swap(temp); //swap() вызывается явно для this, изменяя текущий объект. 
-        }
+        if (this != &rhs) { // случай с самоприсваиванием
+            if (rhs.GetSize() == 0) { // случай с присваеванием пустого контейнера
+                storage_ = ArrayPtr<Type>{}; // пустой контейнер
+                size_ = 0;
+                capacity_ = 0;
+            }
+            else {
+                SimpleVector temp(rhs); //копия 
+                this->swap(temp); //swap() вызывается явно для this, изменяя текущий объект. 
+            }
         return *this;
     }
 
@@ -235,25 +246,18 @@ public:
     // вместимость вектора должна увеличиться вдвое, а для вектора вместимостью 0 стать равной 1
     Iterator Insert(ConstIterator pos, Type&& value) {
         assert(pos >= begin() && pos <= end()); // Проверка на попадание в диапазон массива
-        size_t index = pos - begin(); // Индекс на вставленное значение и перевод его в size_t 
+        //size_t index = pos - begin(); // Индекс на вставленное значение и перевод его в size_t 
+        // Не понял коммит к предыдущей строке, записал её иначе
+        size_t index = distance(begin(), pos);
 
         if (size_ == capacity_) {
             size_t new_capacity = capacity_ == 0 ? 1 : capacity_ * 2;
-            ArrayPtr<Type> new_storage(new_capacity);
-
-            move(storage_.Get(), storage_.Get() + index, new_storage.Get());
-            new_storage[index] = move(value);
-            move(storage_.Get() + index, storage_.Get() + size_, new_storage.Get() + index + 1);
-
-            storage_ = move(new_storage);
-            capacity_ = new_capacity;
+            Reserve(new_capacity); // Выделение вместимости   
         }
-        else {
-            move_backward(storage_.Get() + index, storage_.Get() + size_, storage_.Get() + size_ + 1);
-            storage_[index] = move(value);
-        }
-
+        move_backward(storage_.Get() + index, storage_.Get() + size_, storage_.Get() + size_ + 1);
+        storage_[index] = move(value)
         ++size_;
+
         return begin() + index;
     }
 
@@ -267,6 +271,7 @@ public:
     // Удаляет элемент вектора в указанной позиции
     // и возвращает итератор, который ссылается на элемент, следующий за удалённым
     Iterator Erase(ConstIterator pos) {
+        assert(pos >= begin() && pos <= end()); // Проверка на попадание в диапазон массива
         Iterator after_erase = storage_.Get() + (pos - storage_.Get()); // В скобках итератор удаляемого элемента и перевод его в size_t 
         move(after_erase + 1, storage_.Get() + size_, after_erase); // Сдвигаем элементы влево
         --size_;
