@@ -4,7 +4,9 @@
 #include <array>
 #include <utility>
 
-using namespace std;
+// using namespace std;
+// Недостаток подключения using namespace std; в заголовычных файлах это конфликт имён
+// Если в другом месте тоже есть cout, list, map, и т.п., они могут конфликтовать с std::cout, std::list, std::map.
 
 //Умный указатель с move - семантикой, управляющий динамическим массивом объектов типа Type.
 //(или сырой указатель в "умном" классе обёртке)
